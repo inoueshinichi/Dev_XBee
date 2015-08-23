@@ -23,7 +23,7 @@ void EV86XBee::begin(Stream &serial) {
 void EV86XBee::bufFlush() {
   // xbeeの内部受信バッファをクリアする
   Serial.println("[Buffer Flush]");
-  while(getPacket()) {
+  while (getPacket() >= 0) {
   };
   Serial.println("-------------------------------------------------");
 }
@@ -58,20 +58,20 @@ void EV86XBee::clearData() {
   get_data = "";
 }
 
-// ホストXBeeの初期化
-void EV86XBee::hsXBeeInit() {
-    Serial.println("Init Host XBee...\n");
-    delay(1000);
-    
-    /*
-    初期化コマンド
-    */
-    Serial.println("-------------------------------------------------");
-}
+//// ホストXBeeの初期化
+//void EV86XBee::hsXBeeInit() {
+//    Serial.println("Init HOST XBee...\n");
+//    delay(1000);
+//    
+//    /*
+//    初期化コマンド
+//    */
+//    Serial.println("-------------------------------------------------");
+//}
 
 // ホストXBeeの設定を確認
 void EV86XBee::hsXBeeStatus() {
-    Serial.println("Get Host XBee Status...\n");
+    Serial.println("Get HOST XBee Status...\n");
     delay(1000);
     /*
      Reference getAtCommand(uint8_t* ATcommand, utint8_t* ATparameter)
@@ -99,29 +99,30 @@ void EV86XBee::hsXBeeStatus() {
     getATCommand(hvCmd, NULL);      // XBee Hardware Version
     getATCommand(vrCmd, NULL);      // XBee Firmware Version
     
-    Serial.println("-------------------------------------------------");
+    Serial.println("[[[Finish checking HOST xbee node parameters]]]");
+    Serial.println("------------------------------------------------------");
 }
 
-// リモートXBeeの設定の初期化
-void EV86XBee::rmXBeeInit() {
-  Serial.println("Init Remote XBee...");
-  Serial.print("Address64[0x");
-    Serial.print(_dstAdd64.getMsb(), HEX);
-    Serial.print(" 0x");
-    Serial.print(_dstAdd64.getLsb(), HEX);
-    Serial.print("]\n");
-    Serial.println();
-    delay(1000);
-     
-    /*
-    初期化コマンド
-    */
-    Serial.println("-------------------------------------------------");
-}
+//// リモートXBeeの設定の初期化
+//void EV86XBee::rmXBeeInit() {
+//  Serial.println("Init REMOTE XBee...");
+//  Serial.print("Address64[0x");
+//    Serial.print(_dstAdd64.getMsb(), HEX);
+//    Serial.print(" 0x");
+//    Serial.print(_dstAdd64.getLsb(), HEX);
+//    Serial.print("]\n");
+//    Serial.println();
+//    delay(1000);
+//     
+//    /*
+//    初期化コマンド
+//    */
+//    Serial.println("-------------------------------------------------");
+//}
 
 // リモートXBeeの設定を確認
 void EV86XBee::rmXBeeStatus() {
-    Serial.println("Get Remote XBee...");
+    Serial.println("Get REMOTE XBee...");
     Serial.print("Address64[0x");
     Serial.print(_dstAdd64.getMsb(), HEX);
     Serial.print(" 0x");
@@ -150,7 +151,8 @@ void EV86XBee::rmXBeeStatus() {
     getRemoteATCommand(hvCmd, NULL);    // XBee Hardware Version
     getRemoteATCommand(vrCmd, NULL);    // XBee Firmware Version
     
-    Serial.println("-------------------------------------------------");
+    Serial.println("[[[Finish checking REMOTE xbee node parameters]]]");
+    Serial.println("------------------------------------------------------");
 }
          
 // ATコマンド用のAPIフレーム送受信プログラム
@@ -168,11 +170,12 @@ void EV86XBee::getATCommand(uint8_t* sendCmd, uint8_t* cmdValue) {
     
     // XBeeにATコマンド要求を出す
     _xbee.send(_atRequest);
-    // レスポンスパケットまで待機(不可変でセッティングしてる)
+    
     delay(100);
     
     //　返答パケットを取得
-    getPacket();
+    while (getPacket() == AT_COMMAND_RESPONSE) {
+    };
 }
 
 // リモートATコマンド用のAPIフレーム送受信プログラム
@@ -190,16 +193,17 @@ void EV86XBee::getRemoteATCommand(uint8_t* sendCmd, uint8_t* cmdValue) {
     
     // リモートで指定したXBeeにATコマンド要求を出す
     _xbee.send(_rmAtRequest);
-    // レスポンスパケットまで待機(不可変でセッティングしてる) 無線の場合遅延が大きので、もしかしたら、足りないかも
+    
     delay(100);
     
     // 返答パケットを取得
-    getPacket();
+    while (getPacket() == REMOTE_AT_COMMAND_RESPONSE) {
+    };
 }
 
 // XBeeからの受信Packetを解析関数
-boolean EV86XBee::getPacket() { // デフォルト引数はプロトタイプ宣言部のみに記述する　(get_data = "")
-    boolean flag = true;
+int EV86XBee::getPacket() { // デフォルト引数はプロトタイプ宣言部のみに記述する　(get_data = "")
+    int result = -1;
 
     // APIフレームを受信
     _xbee.readPacket();
@@ -236,18 +240,21 @@ boolean EV86XBee::getPacket() { // デフォルト引数はプロトタイプ宣
                 Serial.print("length:");
                 Serial.println(get_data.length());
                 Serial.println();
+                result = ZB_RX_RESPONSE;
                 break;
             
 //            //////////////////////////////////////ClusterIDを含んだデータパケット///////////////////////////////////////
 //            case ZB_EXPLICIT_RX_RESPONSE :
 //                Serial.println("Frame ID : [ZB_EXPLICIT_RX_RESPONSE]");
 //                Serial.println("Zb_explicit_rx_response has not implemented yet.");
+//                result = ZB_EXPLICIT_RX_RESPONSE;
 //                break;
 //            
 //            //////////////////////////////////////IO_Sample用のデータパケット///////////////////////////////////////
 //            case ZB_IO_SAMPLE_RESPONSE : 
 //                Serial.println("Frame ID : [ZB_IO_SAMPLE_RESPONSE]");
 //                Serial.println("Zb_io_sample_response has not implemented yet.");
+//                ZB_IO_SAMPLE_RESPONSE;
 //                break;
                 
             //////////////////////////////////////送信パケットが無事に送信されたかどうかのチェックレスポンス///////////////////////////////////////
@@ -319,6 +326,7 @@ boolean EV86XBee::getPacket() { // デフォルト引数はプロトタイプ宣
 //                Serial.print("DeliveryStatus  "); Serial.println(_zbTxStatusResponse.getDeliveryStatus());
 //                Serial.print("DiscoveryStatus "); Serial.println(_zbTxStatusResponse.getDiscoveryStatus());
                 Serial.println();
+                result = ZB_TX_STATUS_RESPONSE;
                 break;
                 
             /////////////////////////////////ATコマンドレスポンスパケット//////////////////////////////////////
@@ -372,6 +380,7 @@ boolean EV86XBee::getPacket() { // デフォルト引数はプロトタイプ宣
                         }
                     }
                 }
+                result = AT_COMMAND_RESPONSE;
                 break;
                 
                 
@@ -426,6 +435,7 @@ boolean EV86XBee::getPacket() { // デフォルト引数はプロトタイプ宣
                         } 
                     }
                 }
+                result = REMOTE_AT_COMMAND_RESPONSE;
                 break;
                 
             case MODEM_STATUS_RESPONSE :
@@ -468,31 +478,37 @@ boolean EV86XBee::getPacket() { // デフォルト引数はプロトタイプ宣
                       Serial.println("Other ERROR");
                       break;
                 }
+                result = MODEM_STATUS_RESPONSE;
                 break;
-//                
+                
 //            case XBEE_SENSOR_READ_INDICATOR :
 //                Serial.println("Frame ID : [XBEE_SENSOR_READ_INDICATOR]");
 //                Serial.println("Xbee_sensor_read_indicator has not implemented yet.");
+//                result = XBEE_SENSOR_READ_INDICATOR;
 //                break;
 //                
 //            case ZB_IO_NODE_IDENTIFIER_RESPONSE :
 //                Serial.println("Frame ID : [ZB_IO_IDENTIFIER_RESPONSE]");
 //                Serial.println("Zb_io_node_indentifier_response has not implemented yet.");
+//                result = ZB_IO_NODE_IDENTIFIER_RESPONSE;
 //                break;
 //            
 //            case OVER_THE_AIR_FIRMWARE_UPDATE_STATUS :
 //                Serial.println("Frame ID : [OVER_THE_AIR_FIRMWARE_UPDATE_STATUS]");
 //                Serial.println("Over-the-air-firmware-update-status has not implemented yet.");
+//                result = OVER_THE_AIR_FIRMWARE_UPDATE_STATUS;
 //                break;
 //            
 //            case ROUTE_RECORD_INDICATOR :
 //                Serial.println("ROUTE_RECORD_INDICATOR");
 //                Serial.println("Route_recode_indicator  has not implemented yet.");
+//                result = ROUTE_RECORD_INDICATOR;
 //                break;
 //            
 //            case ZB_MANY_TO_ONE_ROUTE_REQUEST_INDICATOR :
 //                Serial.println("ZB_MANY_TO_ONE_ROUTE_REQUEST_INDICATOR");
 //                Serial.println("Many-to-one-route-request-indicator  has not implemented yet.");
+//                reuslt = ZB_MANY_TO_ONE_ROUTE_REQUEST_INDICATOR;
 //                break;
                 
             /////////////////////その他のAPI Idを受け取った場合、ここはIdの種類に応じて各自拡張できる//////////////////////  
@@ -527,10 +543,9 @@ boolean EV86XBee::getPacket() { // デフォルト引数はプロトタイプ宣
         // そもそもパケットが受信できない つまり、ハードウェアトラブルかPANに他のXBeeデバイスがいない
         else { 
             Serial.println("No response from radio."); 
-            flag = false; // 内部受信バッファに何もなくなったら状態を変える
         } 
     }
-  return flag; // XBee内部の受信バッファ内のデータの状態を返す
+  return result; // XBee内部の受信バッファ内のフレームデータの状態を返す
 }
 
 boolean EV86XBee::checkData(String request) {

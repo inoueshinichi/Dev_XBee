@@ -8,74 +8,115 @@
 *
 */
 
+#define MEGA
+//#define EDISON
+
 // ヘッダーのインクルード
-#include "ev86XBee.h"        
+#ifdef MEGA
+#include <SoftwareSerial.h>
+#endif
+
+#include "ev86XBee.h"   
+
+#ifdef MEGA
+int rx = 10;
+int tx = 11;
+SoftwareSerial myserial = SoftwareSerial(rx, tx);
+#endif
+
+String request = "request";    // コールバック用変数
+String startAck = "startAck2";      // コネクション許可応答
+String senData = "Water Temp"; // センサー値(仮)
 
 // Coordinatorの情報
 typedef struct {
   uint32_t h64Add;
   uint32_t l64Add;
   String nodeName;
+  String startReq;
+  String startAck;
+  
 } XBeeNode;
 
-XBeeNode xbeeCoor = { 0x0013A200, 0x40B77090, "Coordinator" };  
+// Coordinator情報の初期化
+XBeeNode coor = { 0x0013A200, 0x40B77090, "Coordinator", "startReq", "startAck" };  
 
 // XBeeをRouterとして起動
 EV86XBeeR router = EV86XBeeR();
-String senData = "Inoue Shinichi"; // センサー値(仮)
-String request = "request";    // コールバック用変数
-String startReq = "start"; // 送信命令
-String stopReq = "stop"; // 送信停止命令
-//boolean transmit = true; // 送受信状態
-
 
 void setup() {
   Serial.begin(9600);                          // Arduino-PC間の通信
+#ifdef MEGA
+  myserial.begin(9600);
+  myserial.flush();
+  router.begin(myserial);
+#endif
+
+#ifdef EDISON
   Serial1.begin(9600);                         // Arduino-XBee間の通信
   Serial1.flush();
   router.begin(Serial1);
+#endif
   delay(5000); 
   
-  
-  router.bufFlush();                           // ホストXBeeの内部受信バッファをフラッシュする
+  // ホストXBeeの内部受信バッファをフラッシュする
+  router.bufFlush();                         
   delay(1000);
-
-  router.hsXBeeStatus();                     // ホストXBeeの設定確認用メソッド
+  
+  // ホストXBeeの設定確認用メソッド
+  router.hsXBeeStatus();                     
   delay(2000);
   
-  router.setDstAdd64(xbeeCoor.h64Add, xbeeCoor.l64Add);
+  // リモートXBeeの情報を確認
+  router.setDstAdd64(coor.h64Add, coor.l64Add);
   router.rmXBeeStatus();
   Serial.println("Finish checking destination xbee node parameters");
-  delay(5000);
-
-  router.broadcastRequest(startReq);                 // リモートXBeeへ要求を出す
+  delay(2000);
 }
 
- void loop() {
-  Serial.println("-----------------------------");
+void loop() {
+  // 受信データの初期化
+  router.clearData();
   
+  Serial.println("-----------------------------");
   // 受信パケットの確認
   Serial.println("[get Packet]");
   router.getPacket();
   delay(300);
- 
-  // 受信データがコーディネータからのリクエストかチェック
-  if (router.checkData(request)) {
-    // 受信データがリクエストだった場合
+   
+  // 受信データが接続要求だった場合 
+  if (router.checkData(coor.startReq)) {
+   Serial.println("get startReq");
+   
+   // 接続応答を送信
+   router.sendData(startAck);
+   
+   // 送信状態のチェック
+   Serial.println("[get Packet]");
+   router.getPacket(); 
+  }
+  // 受信データが接続応答だった場合 
+  else if (router.checkData(coor.startAck)) {
+   Serial.println("Connected with coordinator");
+   
+  }  
+  // 受信データがリクエストだった場合
+  else if (router.checkData(request)) {
+    // センサーデータを送信する
     Serial.print("send :");
     Serial.println(senData);
     router.sendData(senData);
+    Serial.println();
     delay(100);
+    
+    // 送信状態のチェック
     Serial.println("[get Packet]");
-    router.getPacket();
+    router.getPacket();  
     
   } // データが来ていない場合
   else {
-    Serial.println("No send");
+    Serial.println("Not send");
   }
   
-  // 受信データの初期化
-  router.clearData();
-  delay(300);
-  
+  delay(300); 
 }
